@@ -101,7 +101,7 @@ void irRecto() {
     // continuar; leerSensoresEstado() será evaluado al inicio del while
   }
 }
-}
+
 
 
 void girarDerechaTicks(unsigned long ticks) {
@@ -127,24 +127,20 @@ void girarIzquierdaTicks(unsigned long ticks) {
 
 // corrección hasta recuperar ambos sensores==3 o hasta tope de pasos
 bool corregirHastaAmbos(File &logFile) {
-  Serial.println("Corrigiendo");
   unsigned long pasos = 0;
 
   while (pasos < CORRECTION_STEP_LIMIT) {
     int estado = leerSensoresEstado();
 
     // escribir el estado actual a la SD (registro de ruta)
-    if (logFile) {
-      logFile.println(estado);
-      logFile.flush();
-    }
+    logFile.println(estado);
+    logFile.flush();
 
-    Serial.println(estado);
     if (estado == 3) return true;
     else if (estado == 2) {
-      girarDerechaTicks(1);
+      girarDerechaTicks(20);
     } else if (estado == 1){
-      girarIzquierdaTicks(1);
+      girarIzquierdaTicks(20);
     }
     pasos++;
   }
@@ -221,7 +217,6 @@ void modoReproducir(bool verbose = true) {
     if (estado < 0 || estado > 3) continue;
     if (verbose) {
       Serial.print("Estado leido: ");
-      Serial.println(estado);
     }
     ejecutarEstado(estado);
   }

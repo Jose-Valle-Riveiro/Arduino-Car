@@ -89,17 +89,18 @@ void avanzarTicks(unsigned long ticks) {
 
 // Se mueve indefinidamente recto hasta que no se detecte las condiciones necesarias
 void irRecto() {
-  while(true){
+  // Avanza en lotes mientras ambos sensores sigan en estado 3.
+  while (true) {
     int estado = leerSensoresEstado();
-    motorDer.run();
-    motorIzq.run();
-
-    if(estado != 3){
-      motorDer.stop();
-      motorIzq.stop();
+    if (estado != 3) {
+      // ya no estamos sobre la linea, paramos
       break;
     }
+    // Avanzamos un pequeño lote de pasos (mantiene velocidad, permite reaccionar rápido)
+    avanzarTicks(32);
+    // continuar; leerSensoresEstado() será evaluado al inicio del while
   }
+}
 }
 
 
@@ -125,14 +126,19 @@ void girarIzquierdaTicks(unsigned long ticks) {
 }
 
 // corrección hasta recuperar ambos sensores==3 o hasta tope de pasos
-bool corregirHastaAmbos() {
-  File f = SD.open(ROUTE_FILE, FILE_WRITE);
+bool corregirHastaAmbos(File &logFile) {
   Serial.println("Corrigiendo");
   unsigned long pasos = 0;
+
   while (pasos < CORRECTION_STEP_LIMIT) {
     int estado = leerSensoresEstado();
-    f.println(estado);
-    f.flush();
+
+    // escribir el estado actual a la SD (registro de ruta)
+    if (logFile) {
+      logFile.println(estado);
+      logFile.flush();
+    }
+
     Serial.println(estado);
     if (estado == 3) return true;
     else if (estado == 2) {
@@ -167,10 +173,10 @@ void modoGrabar() {
     if (estado == 3) {
       avanzarTicks(256);
     } else if (estado == 2) {
-      bool ok = corregirHastaAmbos();
+      bool ok = corregirHastaAmbos(f);
       if (!ok) Serial.println("Timeout correccionDerecha. Continuando.");
     } else if (estado == 1) {
-      bool ok = corregirHastaAmbos();
+      bool ok = corregirHastaAmbos(f);
       if (!ok) Serial.println("Timeout correccionIzquierda. Continuando.");
     } else { // 0
       Serial.println("Ninguno detecta -> fin de grabación.");

@@ -15,7 +15,22 @@
 const int SD_CS = 4;
 const int S_LEFT_PIN  = 2;
 const int S_RIGHT_PIN = 3;
+const int BUZZER_PIN = A2;
 
+int melody[] = {
+  660, 660, 0, 660, 0, 520, 660, 0, 770, 0, 380
+};
+
+int noteDurations[] = {
+  100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100
+};
+
+int numNotes = sizeof(melody) / sizeof(melody[0]);
+
+// Variables para control con millis()
+unsigned long previousMillis = 0;
+int noteIndex = 0;
+bool playingMelody = false;
 // ---------- CheapStepper ----------
 CheapStepper motorDer(5, 6, 7, 8);   // motor izquierdo (reflejado)
 CheapStepper motorIzq(9, 10, A0, A1); // motor derecho
@@ -23,6 +38,8 @@ CheapStepper motorIzq(9, 10, A0, A1); // motor derecho
 // dirección lógica (no se usa para movimientos de corrección explícitos)
 bool IzqClockwise = false;
 bool DerClockwise = true;
+
+
 
 // ---------- Archivos ----------
 const char* CONFIG_FILE = "config.txt";
@@ -138,9 +155,9 @@ bool corregirHastaAmbos(File &logFile) {
 
     if (estado == 3) return true;
     else if (estado == 2) {
-      girarDerechaTicks(20);
+      girarDerechaTicks(100);
     } else if (estado == 1){
-      girarIzquierdaTicks(20);
+      girarIzquierdaTicks(100);
     }
     pasos++;
   }
@@ -160,14 +177,15 @@ void modoGrabar() {
     Serial.println("ERROR: no se pudo abrir route.txt para escritura.");
     return;
   }
-
+  
   while (true) {
+    reproducirMelodia();
     int estado = leerSensoresEstado();
     f.println(estado);
     f.flush();
 
     if (estado == 3) {
-      avanzarTicks(256);
+      avanzarTicks(128);
     } else if (estado == 2) {
       bool ok = corregirHastaAmbos(f);
       if (!ok) Serial.println("Timeout correccionDerecha. Continuando.");
@@ -187,11 +205,11 @@ void modoGrabar() {
 
 void ejecutarEstado(int estado) {
   if (estado == 3) {
-    avanzarTicks(256);
+    avanzarTicks(128);
   } else if (estado == 2) {
-    girarDerechaTicks(1);
+    girarDerechaTicks(100);
   } else if (estado == 1) {
-    girarIzquierdaTicks(1);
+    girarIzquierdaTicks(100);
   } else {
     delay(100);
   }
@@ -208,8 +226,10 @@ void modoReproducir(bool verbose = true) {
     Serial.println("No se pudo abrir route.txt");
     return;
   }
+  
 
   while (f.available()) {
+    reproducirMelodia();
     String line = f.readStringUntil('\n');
     line.trim();
     if (line.length() == 0) continue;
@@ -224,8 +244,36 @@ void modoReproducir(bool verbose = true) {
   Serial.println("Reproducción terminada.");
 }
 
+void reproducirMelodia() {
+  if (!playingMelody) return; // si no está activa, salir
+
+  unsigned long currentMillis = millis();
+
+  if (noteIndex < numNotes) {
+    int noteDuration = noteDurations[noteIndex];
+
+    // Si ya pasó el tiempo de la nota actual
+    if (currentMillis - previousMillis >= noteDuration) {
+      previousMillis = currentMillis;
+
+      if (melody[noteIndex] == 0) {
+        noTone(BUZZER_PIN); // pausa entre notas
+      } else {
+        tone(BUZZER_PIN, melody[noteIndex]);
+      }
+      noteIndex++;
+    }
+  } else {
+    // reinicia la canción cuando termina
+    noteIndex = 0;
+  }
+}
+
+
 // ---------- SETUP y LOOP ----------
 void setup() {
+  pinMode(BUZZER_PIN, OUTPUT);
+  playingMelody = true;
   Serial.begin(115200);
   while (!Serial) {}
 
